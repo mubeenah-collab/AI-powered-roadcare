@@ -35,9 +35,4 @@ RoadVision/
 └── docs/            # Architecture diagrams and system specs
 ```
 
-## 🚀 Getting Started
-```bash
-git clone https://github.com/mubeenah-collab/AI-powered-roadcare.git
-cd AI-powered-roadcare
-docker compose up
-```
+
