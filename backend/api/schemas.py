@@ -1,6 +1,16 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
+class AuthLoginRequestSchema(BaseModel):
+    username: str = Field(..., example="citizen@roadvision.gov.in")
+    password: str = Field(..., example="password123")
+
+class AuthLoginResponseSchema(BaseModel):
+    access_token: str = Field(..., example="jwt_token_sample_12345")
+    token_type: str = Field("bearer", example="bearer")
+    role: str = Field(..., example="citizen")  # 'citizen' or 'admin'
+    user_email: str = Field(..., example="citizen@roadvision.gov.in")
+
 class LocationSchema(BaseModel):
     road_name: str = Field(..., example="Anna Salai")
     area: str = Field(..., example="Teynampet")
