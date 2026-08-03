@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 class LocationSchema(BaseModel):
     road_name: str = Field(..., example="Anna Salai")
@@ -15,6 +15,32 @@ class CoordinatesSchema(BaseModel):
     latitude: float = Field(..., example=12.926543)
     longitude: float = Field(..., example=80.143287)
 
+class WeatherSchema(BaseModel):
+    condition: str = Field(..., example="Rainy")
+    temperature_c: float = Field(..., example=31.0)
+    humidity_pct: int = Field(..., example=82)
+    visibility_km: float = Field(..., example=4.0)
+    wind_speed_kmh: int = Field(..., example=18)
+    rain_probability_pct: int = Field(..., example=85)
+    weather_risk: str = Field(..., example="High")
+    priority_boost: int = Field(..., example=15)
+    weather_risk_reason: str = Field(..., example="Continuous rainfall may worsen pothole damage.")
+
+class FleetMetadataSchema(BaseModel):
+    vehicle_id: str = Field(..., example="TN01-GOV-024")
+    vehicle_type: str = Field(..., example="Government Bus")
+    department: str = Field(..., example="Greater Chennai Corporation")
+    camera_id: str = Field(..., example="CAM-003")
+    driver_name: Optional[str] = Field("R. Sundaram", example="R. Sundaram")
+    inspection_route: str = Field(..., example="Anna Salai Route")
+    shift: str = Field(..., example="Morning")
+
+class TimelineEventSchema(BaseModel):
+    date_time: str = Field(..., example="2026-08-03 18:46:48")
+    stage: str = Field(..., example="Reported")
+    officer_name: str = Field(..., example="System Ingestion")
+    comments: str = Field(..., example="Road damage report received.")
+
 class DamagePredictionSchema(BaseModel):
     damage_type: str = Field(..., example="Pothole")
     confidence: float = Field(..., example=0.964)
@@ -27,6 +53,11 @@ class DamagePredictionSchema(BaseModel):
     road_occupancy: float = Field(..., example=8.4)
     location: LocationSchema
     coordinates: CoordinatesSchema
+    weather: WeatherSchema
+    fleet_info: Optional[FleetMetadataSchema] = None
+    timeline: List[TimelineEventSchema]
+    before_image_url: Optional[str] = Field("assets/images/before_repair_sample.jpg", example="assets/images/before_repair_sample.jpg")
+    after_image_url: Optional[str] = Field(None, example="assets/images/after_repair_sample.jpg")
     complaint_id: str = Field(..., example="RV-2026-001245")
     status: str = Field(..., example="Pending Verification")
     timestamp: str
@@ -34,17 +65,25 @@ class DamagePredictionSchema(BaseModel):
     road_health_score: float = Field(..., example=24.5)
     road_condition: str = Field(..., example="Poor")
 
-class LifecycleStatusUpdateSchema(BaseModel):
-    status: str = Field(..., example="Assigned")
-    contractor_name: Optional[str] = Field(None, example="Municipal Paving Corp")
-    assigned_team_id: Optional[str] = Field(None, example="TEAM-WEST-02")
-    notes: Optional[str] = Field(None, example="Road surface patched and verified.")
+class CompleteRepairPayloadSchema(BaseModel):
+    after_image_url: str = Field(..., example="assets/images/after_repair_sample.jpg")
+    officer_name: str = Field(..., example="Officer K. Rajan")
+    comments: str = Field(..., example="Resurfacing completed with high-durability asphalt patch.")
 
-class SystemAnalyticsSchema(BaseModel):
-    total_complaints: int
-    critical_defects: int
-    high_defects: int
-    pending_repairs: int
-    completed_repairs: int
+class AdvancedAnalyticsSchema(BaseModel):
+    total_roads_scanned_km: int
+    total_images_processed: int
     citizen_reports_count: int
     government_fleet_count: int
+    average_ai_accuracy_pct: float
+    average_confidence_pct: float
+    average_road_health_score: float
+    average_repair_time_days: float
+    critical_defects_count: int
+    pending_verification: int
+    assigned_repairs: int
+    completed_repairs: int
+    most_dangerous_zone: str
+    most_reported_road: str
+    most_active_vehicle: str
+    repair_completion_rate_pct: float

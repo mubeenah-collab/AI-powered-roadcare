@@ -7,12 +7,12 @@ logger = logging.getLogger("roadvision.geocoding")
 
 class ReverseGeocoder:
     """
-    Reverse Geocoding Service translating GPS (lat, lng) into detailed Human-Readable Address:
+    Reverse Geocoding Service translating GPS (lat, lng) into Indian Human-Readable Addresses:
     Road Name, Area / Locality, City, District, State, Country, Postal Code.
     """
     
     def __init__(self):
-        self.geolocator = Nominatim(user_agent="RoadVision-AI-Monitor/3.0")
+        self.geolocator = Nominatim(user_agent="RoadVision-AI-Indian-Roads/4.0")
         self._cache = {}
 
     def reverse_geocode(self, latitude: Optional[float], longitude: Optional[float]) -> Dict[str, Any]:
@@ -60,7 +60,7 @@ class ReverseGeocoder:
                 self._cache[cache_key] = res
                 return res
         except Exception as e:
-            logger.warning(f"Geocoding service fallback: {e}")
+            logger.warning(f"Geocoding service fallback to Indian location defaults: {e}")
             
         fallback = {
             "road_name": "Anna Salai",

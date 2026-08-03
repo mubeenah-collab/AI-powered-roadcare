@@ -1,14 +1,15 @@
 import io
 import cv2
 import uuid
+import time
 import numpy as np
 from PIL import Image
 from typing import List, Optional
 from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Query
 from backend.api.schemas import (
     DamagePredictionSchema,
-    LifecycleStatusUpdateSchema,
-    SystemAnalyticsSchema
+    CompleteRepairPayloadSchema,
+    AdvancedAnalyticsSchema
 )
 from ai.pipeline import pipeline
 from database.db import db_manager
@@ -32,9 +33,7 @@ async def predict_road_damage(
     source: str = Form("Citizen")
 ):
     """
-    Primary Road Vision AI Detection API.
-    Captures GPS coordinates, performs Reverse Geocoding to derive Human-Readable Address,
-    executes YOLOv11 & MiDaS monocular 3D depth, and saves internal coordinates to PostGIS.
+    Primary AI Inference API with Indian Geocoding, Live Weather, and Priority Boost.
     """
     contents = await file.read()
     image_bgr = read_image_bytes(contents)
@@ -46,39 +45,31 @@ async def predict_road_damage(
         source=source
     )
 
-    db_record = {
-        "id": result["complaint_id"],
-        "image_id": f"img_{uuid.uuid4().hex[:8]}",
-        "source": source,
-        "damage_type": result["damage_type"],
-        "confidence": result["confidence"],
-        "severity": result["severity"],
-        "priority_score": result["priority_score"],
-        "estimated_width_m": result["estimated_width_m"],
-        "estimated_length_m": result["estimated_length_m"],
-        "estimated_area_m2": result["estimated_area_m2"],
-        "estimated_depth_cm": result["estimated_depth_cm"],
-        "road_occupancy": result["road_occupancy"],
-        "coordinates": result["coordinates"],
-        "location": result["location"],
-        "status": result["status"],
-        "road_health_score": result["road_health_score"],
-        "road_condition": result["road_condition"]
-    }
-    await db_manager.save_or_merge_report(db_record)
-
+    await db_manager.save_or_merge_report(result)
     return DamagePredictionSchema(**result)
 
 @router.post("/predict-batch")
 async def predict_batch_fleet(
     files: List[UploadFile] = File(...),
-    vehicle_id: str = Form("GOVT-BUS-102")
+    vehicle_id: str = Form("TN01-GOV-024"),
+    vehicle_type: str = Form("Government Bus"),
+    department: str = Form("Greater Chennai Corporation")
 ):
+    fleet_meta = {
+        "vehicle_id": vehicle_id,
+        "vehicle_type": vehicle_type,
+        "department": department,
+        "camera_id": "CAM-003",
+        "driver_name": "R. Sundaram",
+        "inspection_route": "Anna Salai Route",
+        "shift": "Morning"
+    }
+
     results = []
     for file in files:
         contents = await file.read()
         image_bgr = read_image_bytes(contents)
-        res = pipeline.process_image(image_bgr, source="Government Fleet")
+        res = pipeline.process_image(image_bgr, source="Government Fleet", fleet_meta=fleet_meta)
         results.append(res)
         
     return {
@@ -93,28 +84,40 @@ async def get_all_complaints(limit: int = Query(100, ge=1, le=500)):
     reports = await db_manager.get_all_reports(limit=limit)
     return {"status": "success", "count": len(reports), "reports": reports}
 
-@router.put("/admin/lifecycle/{complaint_id}")
-async def update_repair_lifecycle_status(complaint_id: str, payload: LifecycleStatusUpdateSchema):
+@router.put("/admin/repair-complete/{complaint_id}")
+async def complete_repair_with_after_image(
+    complaint_id: str,
+    payload: CompleteRepairPayloadSchema
+):
+    """
+    Uploads After-Repair Road Image, adds Timeline Event, and advances Lifecycle Status to Completed.
+    """
     reports = await db_manager.get_all_reports(limit=500)
     for r in reports:
-        if r.get("id") == complaint_id:
-            r["status"] = payload.status
-            if payload.contractor_name:
-                r["assigned_contractor"] = payload.contractor_name
-            return {"status": "success", "message": f"Complaint {complaint_id} updated to status [{payload.status}]", "report": r}
+        if r.get("complaint_id") == complaint_id or r.get("id") == complaint_id:
+            r["status"] = "Completed"
+            r["after_image_url"] = payload.after_image_url
+            
+            # Append Timeline Stage
+            timeline = r.get("timeline", [])
+            timeline.append({
+                "date_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                "stage": "Completed",
+                "officer_name": payload.officer_name,
+                "comments": payload.comments
+            })
+            r["timeline"] = timeline
+            
+            return {
+                "status": "success",
+                "message": f"Repair for complaint {complaint_id} marked as Completed with After-Repair image verification.",
+                "report": r
+            }
             
     raise HTTPException(status_code=404, detail="Complaint ID not found.")
 
-@router.get("/admin/dashboard", response_model=SystemAnalyticsSchema)
-@router.get("/statistics", response_model=SystemAnalyticsSchema)
-async def get_analytics_dashboard():
-    stats = await db_manager.get_statistics()
-    return SystemAnalyticsSchema(
-        total_complaints=stats["total_complaints"],
-        critical_defects=stats["critical"],
-        high_defects=stats["high"],
-        pending_repairs=stats["pending_repairs"],
-        completed_repairs=stats["completed_repairs"],
-        citizen_reports_count=stats["citizen_reports"],
-        government_fleet_count=stats["government_reports"]
-    )
+@router.get("/admin/dashboard", response_model=AdvancedAnalyticsSchema)
+@router.get("/admin/analytics", response_model=AdvancedAnalyticsSchema)
+async def get_advanced_analytics():
+    analytics = await db_manager.get_analytics_summary()
+    return AdvancedAnalyticsSchema(**analytics)

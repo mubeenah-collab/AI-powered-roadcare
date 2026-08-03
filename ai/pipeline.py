@@ -9,6 +9,7 @@ from ai.depth_estimator import DepthEstimator
 from ai.severity_engine import SeverityEngine
 from ai.road_health import RoadHealthEvaluator
 from ai.geocoding import geocoder
+from ai.weather_service import weather_service
 
 CLASS_MAPPING = {
     0: "Longitudinal Crack",
@@ -30,21 +31,23 @@ class RoadVisionPipeline:
         image_bgr: np.ndarray,
         latitude: Optional[float] = 12.926543,
         longitude: Optional[float] = 80.143287,
-        source: str = "Citizen"
+        source: str = "Citizen",
+        fleet_meta: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         start_time = time.time()
         img_h, img_w = image_bgr.shape[:2]
 
-        # 1. OpenCV Preprocessing
+        # 1. Preprocessing & Depth Map
         preprocessed_img, meta = self.preprocessor.preprocess_image(image_bgr)
-
-        # 2. MiDaS Monocular Depth Map
         depth_map = self.depth_estimator.predict_depth_map(image_bgr)
 
-        # 3. Reverse Geocoding for Human-Readable Address
+        # 2. Reverse Geocoding (Indian Locations)
         location_data = geocoder.reverse_geocode(latitude, longitude)
 
-        # 4. YOLO Object Detection & Damage Classification
+        # 3. Live Weather Information & Risk Assessment
+        weather_data = weather_service.get_weather_info(latitude, longitude)
+
+        # 4. YOLO Object Detection
         results = self.model.predict(source=image_bgr, conf=0.30, verbose=False)[0]
 
         detections = []
@@ -57,15 +60,12 @@ class RoadVisionPipeline:
                 xyxy = box.xyxy[0].cpu().numpy().tolist()
                 
                 damage_type = CLASS_MAPPING.get(cls_id, "Pothole")
-                
-                # 3D Metric Calculations
                 metrics = self.depth_estimator.estimate_metrics(
                     image_shape=(img_h, img_w),
                     bbox=xyxy,
                     depth_map=depth_map
                 )
 
-                # Severity & Priority Engine
                 sev_res = SeverityEngine.calculate_severity_and_priority(
                     damage_type=damage_type,
                     confidence=confidence,
@@ -73,11 +73,14 @@ class RoadVisionPipeline:
                     source=source
                 )
 
+                # Add weather rain risk priority boost
+                final_priority = min(100, sev_res["priority_score"] + weather_data["priority_boost"])
+
                 det_entry = {
                     "damage_type": damage_type,
                     "confidence": confidence,
                     "severity": sev_res["severity"],
-                    "priority_score": sev_res["priority_score"],
+                    "priority_score": final_priority,
                     "estimated_width_m": metrics["estimated_width_m"],
                     "estimated_length_m": metrics["estimated_length_m"],
                     "estimated_area_m2": metrics["estimated_area_m2"],
@@ -92,12 +95,12 @@ class RoadVisionPipeline:
                 bbox=[180, 220, 310, 360],
                 depth_map=depth_map
             )
-            sev_res = SeverityEngine.calculate_severity_and_priority("Pothole", 0.964, metrics, source)
+            final_priority = min(100, 89 + weather_data["priority_boost"])
             detections.append({
                 "damage_type": "Pothole",
                 "confidence": 0.964,
                 "severity": "High",
-                "priority_score": 89,
+                "priority_score": final_priority,
                 "estimated_width_m": 0.82,
                 "estimated_length_m": 1.05,
                 "estimated_area_m2": 0.86,
@@ -108,8 +111,38 @@ class RoadVisionPipeline:
         health_eval = RoadHealthEvaluator.evaluate_road_health(detections)
         primary_det = detections[0]
         complaint_id = f"RV-2026-{uuid.uuid4().hex[:6].upper()}"
+        current_time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+
+        # Fleet Metadata handling
+        default_fleet = {
+            "vehicle_id": "TN01-GOV-024",
+            "vehicle_type": "Government Bus",
+            "department": "Greater Chennai Corporation",
+            "camera_id": "CAM-003",
+            "driver_name": "R. Sundaram",
+            "inspection_route": "Anna Salai Route",
+            "shift": "Morning"
+        } if "fleet" in source.lower() or "bus" in source.lower() or "truck" in source.lower() else None
+
+        # Complaint Timeline Array
+        timeline = [
+            {
+                "date_time": current_time_str,
+                "stage": "Reported",
+                "officer_name": "System Ingestion",
+                "comments": f"Road damage report received via {source}."
+            },
+            {
+                "date_time": current_time_str,
+                "stage": "AI Detection Completed",
+                "officer_name": "RoadVision AI Core Engine",
+                "comments": f"YOLOv11 classified {primary_det['damage_type']} with {int(primary_det['confidence']*100)}% confidence."
+            }
+        ]
 
         return {
+            "complaint_id": complaint_id,
+            "source": source,
             "damage_type": primary_det["damage_type"],
             "confidence": primary_det["confidence"],
             "severity": primary_det["severity"],
@@ -124,10 +157,13 @@ class RoadVisionPipeline:
                 "latitude": latitude,
                 "longitude": longitude
             },
-            "complaint_id": complaint_id,
+            "weather": weather_data,
+            "fleet_info": fleet_meta or default_fleet,
+            "timeline": timeline,
+            "before_image_url": "assets/images/before_repair_sample.jpg",
+            "after_image_url": None,
             "status": "Pending Verification",
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "source": source,
             "road_health_score": health_eval["road_health_score"],
             "road_condition": health_eval["road_condition"]
         }

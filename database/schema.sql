@@ -1,4 +1,4 @@
--- RoadVision PostGIS Database Schema (Human-Readable Address + Internal Coordinates)
+-- RoadVision Enterprise PostGIS Schema (Indian Location Support, Live Weather, Fleet Metadata & Timeline)
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -23,12 +23,37 @@ CREATE TABLE IF NOT EXISTS damage_reports (
     road_health_score FLOAT NULL,
     road_condition VARCHAR(50) NULL,
     
-    -- Internal Coordinates (GIS Mapping, Heatmaps, Spatial Queries, Duplicate Detection)
+    -- Live Weather Metadata
+    weather_condition VARCHAR(50) NULL,
+    temperature_c FLOAT NULL,
+    humidity_pct INT NULL,
+    visibility_km FLOAT NULL,
+    wind_speed_kmh INT NULL,
+    rain_probability_pct INT NULL,
+    weather_risk VARCHAR(50) NULL,
+    
+    -- Government Fleet Metadata
+    vehicle_id VARCHAR(100) NULL,
+    vehicle_type VARCHAR(100) NULL,
+    department VARCHAR(150) NULL,
+    camera_id VARCHAR(100) NULL,
+    driver_name VARCHAR(150) NULL,
+    inspection_route VARCHAR(255) NULL,
+    shift VARCHAR(50) NULL,
+    
+    -- Repair Images
+    before_image_url TEXT NULL,
+    after_image_url TEXT NULL,
+    
+    -- Complaint Timeline JSON
+    timeline JSONB NULL,
+    
+    -- Internal Coordinates (GIS Mapping & Duplicate Detection)
     latitude DOUBLE PRECISION NOT NULL,
     longitude DOUBLE PRECISION NOT NULL,
     geom GEOMETRY(Point, 4326) GENERATED ALWAYS AS (ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)) STORED,
     
-    -- Display Fields (Human-Readable Address for Users & Frontend Display)
+    -- Indian Display Address Fields
     road_name TEXT NULL,
     area TEXT NULL,
     city TEXT NULL,
@@ -38,7 +63,6 @@ CREATE TABLE IF NOT EXISTS damage_reports (
     postal_code TEXT NULL,
     formatted_address TEXT NULL,
     
-    -- 8-Stage Repair Lifecycle
     status VARCHAR(100) NOT NULL DEFAULT 'Pending Verification',
     verification_count INT NOT NULL DEFAULT 1,
     assigned_contractor TEXT NULL,

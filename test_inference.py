@@ -15,21 +15,32 @@ def create_synthetic_road_image() -> np.ndarray:
 
 def run_test():
     print("=" * 60)
-    print("   RoadVision AI Pipeline Location Enhancement Test")
+    print("   RoadVision AI Final System Integration Test")
+    print("   Indian Location, Live Weather & Fleet Telematics")
     print("=" * 60)
 
     img = create_synthetic_road_image()
+    # Coordinates for Anna Salai, Teynampet, Chennai, Tamil Nadu
     sample_lat, sample_lng = 12.926543, 80.143287
-    print(f"[*] Reverse geocoding sample GPS ({sample_lat}, {sample_lng})...")
+    print(f"[*] Running inference for coordinates ({sample_lat}, {sample_lng})...")
     
     result = pipeline.process_image(
         image_bgr=img,
         latitude=sample_lat,
         longitude=sample_lng,
-        source="Citizen"
+        source="Government Bus",
+        fleet_meta={
+            "vehicle_id": "TN01-GOV-024",
+            "vehicle_type": "Government Bus",
+            "department": "Greater Chennai Corporation",
+            "camera_id": "CAM-003",
+            "driver_name": "R. Sundaram",
+            "inspection_route": "Anna Salai Route",
+            "shift": "Morning"
+        }
     )
 
-    print("\n[+] Expected Structured Output JSON (Human-Readable Address + Internal Coordinates):")
+    print("\n[+] Final System Output JSON Payload:")
     print(json.dumps(result, indent=2))
     print("=" * 60)
 
