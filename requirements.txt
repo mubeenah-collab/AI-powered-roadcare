@@ -1,0 +1,47 @@
+# Core Computer Vision & Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+ultralytics>=8.1.0
+opencv-python>=4.8.0
+albumentations>=1.3.1
+pillow>=10.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+timm>=0.9.0
+
+# Monocular Depth Estimation & Math
+shapely>=2.0.0
+pyproj>=3.5.0
+
+# Backend & Web Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-multipart>=0.0.6
+
+# Database & Spatial Extensions
+sqlalchemy>=2.0.0
+geoalchemy2>=0.14.0
+psycopg2-binary>=2.9.9
+asyncpg>=0.29.0
+alembic>=1.12.0
+
+# GIS & Geocoding
+geopy>=2.4.0
+
+# Caching & Task Queues
+redis>=5.0.0
+celery>=5.3.0
+
+# MLOps, Metrics & Data Science
+matplotlib>=3.7.0
+seaborn>=0.13.0
+pandas>=2.0.0
+pyyaml>=6.0.1
+tqdm>=4.66.0
+mlflow>=2.8.0
+
+# Testing
+pytest>=7.4.0
+httpx>=0.25.0
