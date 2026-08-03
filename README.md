@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🛣️ RoadVision
+# RoadVision
 
 ### **AI-Powered Intelligent Road Damage Detection & Monitoring System**
 
@@ -19,7 +19,7 @@
 
 ---
 
-## 📌 Project Overview
+## Project Overview
 
 Traditional municipal road inspections rely on visual surveys that are manual, slow, expensive, and reactive. By the time potholes or structural pavement cracks are identified, water ingress has worsened erosion, leading to higher repair budgets and vehicle damage.
 
@@ -31,9 +31,9 @@ The system processes incoming imagery through a multi-stage AI pipeline, calcula
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-### 📱 Citizen Mobile Application
+### Citizen Mobile Application
 - **Instant Camera & Gallery Capture**: Capture high-resolution pavement photos with automatic device camera optimization.
 - **Automated GPS & Indian Geocoding**: Captures latitude and longitude while displaying familiar Indian road addresses (*"Anna Salai, Teynampet, Chennai, Tamil Nadu"*).
 - **Real-Time AI Inspection Output**: Instant feedback displaying defect classification, severity rating, and an **AI Confidence Progress Bar** (`██████████░░ 96.4%`).
@@ -41,18 +41,18 @@ The system processes incoming imagery through a multi-stage AI pipeline, calcula
 - **8-Stage Visual Timeline**: Tracks complaint progression from `Reported` to `Closed`.
 - **Before & After Photo Comparison**: Side-by-side visual verification of resurfaced road defects.
 
-### 🚌 Government Fleet Surveillance
+### Government Fleet Surveillance
 - **Continuous Dashcam Telematics**: Ingests automated frame streams captured by public transit buses and municipal inspection vehicles.
 - **Vehicle Telematics Metadata**: Attaches Vehicle ID (`TN01-GOV-024`), Department, Camera ID, Driver Name, Inspection Route, and Shift.
 - **High-Throughput Batch Processing**: Asynchronous ingestion pipeline designed for continuous urban fleet operations.
 
-### 🧠 Core AI & Vision Engine
+### Core AI & Vision Engine
 - **YOLOv11 Multi-Class Detection**: Detects Potholes, Longitudinal Cracks, Transverse Cracks, Alligator Cracks, Surface Damage, and Road Edge Failures.
 - **MiDaS Monocular Depth Estimation**: Generates 3D depth map gradients from 2D RGB photos, estimating physical width ($m$), length ($m$), surface area ($m^2$), and depth ($cm$).
 - **Road Health Score Engine (0–100%)**: Dynamically rates road segment health (**Excellent**, **Good**, **Fair**, **Poor**, **Critical**).
 - **Weather Hazard Priority Boost**: Automatically adds a **+15 Point Priority Boost** when heavy monsoon rainfall is detected to prioritize waterlogged defects.
 
-### 📊 Administrator Dashboard & GIS Map
+### Administrator Dashboard & GIS Map
 - **Municipal Workorder Dispatching**: View, verify, assign contractors, and manage the 8-stage repair lifecycle.
 - **Interactive OpenStreetMap GIS Map**: Visualizes defect pins with custom severity markers and popups.
 - **Density Heatmaps**: Highlights municipal critical hazard hotspots categorized by risk level.
@@ -60,34 +60,34 @@ The system processes incoming imagery through a multi-stage AI pipeline, calcula
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ```mermaid
 flowchart TD
     subgraph Data Sources
-        A[📱 Citizen Mobile App]
-        B[🚌 Government Fleet Dashcams]
+        A[Citizen Mobile App]
+        B[Government Fleet Dashcams]
     end
 
     subgraph Backend Services
-        C[⚡ FastAPI Backend API]
-        D[⛅ Live Weather Service]
-        E[🗺️ Indian Reverse Geocoder]
+        C[FastAPI Backend API]
+        D[Live Weather Service]
+        E[Indian Reverse Geocoder]
     end
 
     subgraph AI Engine
-        F[📷 OpenCV Preprocessor]
-        G[🎯 YOLOv11 Object Detector]
-        H[📐 MiDaS Monocular Depth Engine]
-        I[⚖️ Severity & Priority Engine]
+        F[OpenCV Preprocessor]
+        G[YOLOv11 Object Detector]
+        H[MiDaS Monocular Depth Engine]
+        I[Severity & Priority Engine]
     end
 
     subgraph Persistence Layer
-        J[(🗄️ PostgreSQL + PostGIS)]
+        J[(PostgreSQL + PostGIS)]
     end
 
     subgraph Municipal Operations
-        K[💻 Flutter Admin Dashboard]
+        K[Flutter Admin Dashboard]
     end
 
     A -->|POST /predict| C
@@ -105,7 +105,7 @@ flowchart TD
 
 ---
 
-## 🔄 AI Pipeline Flowchart
+## AI Pipeline Flowchart
 
 ```mermaid
 flowchart LR
@@ -121,7 +121,7 @@ flowchart LR
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 | Component | Framework / Library | Primary Purpose |
 | :--- | :--- | :--- |
@@ -140,7 +140,7 @@ flowchart LR
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 RoadVision/
@@ -162,7 +162,7 @@ RoadVision/
 
 ---
 
-## 🗄️ Database & Spatial Design
+## Database & Spatial Design
 
 RoadVision utilizes **PostgreSQL 15** with the **PostGIS 3.3** spatial extension to deliver enterprise GIS capabilities:
 - **Spatial Coordinates**: Internal coordinates are stored as `GEOMETRY(Point, 4326)` spatial objects for exact spatial indexing.
@@ -172,7 +172,7 @@ RoadVision utilizes **PostgreSQL 15** with the **PostGIS 3.3** spatial extension
 
 ---
 
-## 📡 API Overview
+## API Overview
 
 The FastAPI backend exposes interactive OpenAPI / Swagger documentation at `http://localhost:8000/docs`.
 
@@ -186,7 +186,7 @@ The FastAPI backend exposes interactive OpenAPI / Swagger documentation at `http
 
 ---
 
-## ⚙️ Installation & Setup
+## Installation & Setup
 
 ### Prerequisites
 - Python 3.10+
@@ -218,7 +218,7 @@ flutter pub get
 
 ---
 
-## 🚀 Running the Project
+## Running the Project
 
 ### Option A: Running with Docker Compose (Recommended)
 ```bash
@@ -246,7 +246,7 @@ python test_inference.py
 
 ---
 
-## 🖼️ Application Screenshots & Interface
+## Application Screenshots & Interface
 
 | Citizen Inspection Screen | Live Weather Impact | Complaint Timeline |
 | :---: | :---: | :---: |
@@ -258,29 +258,29 @@ python test_inference.py
 
 ---
 
-## 🔮 Future Enhancements
+## Future Enhancements
 
-- 🛸 **Autonomous Drone Inspection**: Extend ingestion pipeline to process high-altitude aerial imagery captured by municipal survey drones.
-- 🔮 **Predictive Degradation Modeling**: Implement MLOps time-series algorithms to predict pavement structural failure prior to pothole formation.
-- 📱 **Edge-AI Offline Inference**: Export YOLOv11 models to ONNX / TensorRT / TFLite for offline inference directly on mobile hardware.
-- 🌐 **Multi-Language Support**: Localization support for regional Indian languages across municipal management dashboards.
-- 🛰️ **IoT Acceleration Sensors**: Integrate vehicle accelerometer telematics to detect physical impact bumps automatically.
+- **Autonomous Drone Inspection**: Extend ingestion pipeline to process high-altitude aerial imagery captured by municipal survey drones.
+- **Predictive Degradation Modeling**: Implement MLOps time-series algorithms to predict pavement structural failure prior to pothole formation.
+- **Edge-AI Offline Inference**: Export YOLOv11 models to ONNX / TensorRT / TFLite for offline inference directly on mobile hardware.
+- **Multi-Language Support**: Localization support for regional Indian languages across municipal management dashboards.
+- **IoT Acceleration Sensors**: Integrate vehicle accelerometer telematics to detect physical impact bumps automatically.
 
 ---
 
-## 👥 Contributors
+## Contributors
 
 Contributions are welcome! Please review `CONTRIBUTING.md` before submitting pull requests.
 
 ---
 
-## 📜 License
+## License
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙏 Acknowledgements
+## Acknowledgements
 
 - [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) for real-time object detection architecture.
 - [Intel ISL MiDaS](https://github.com/isl-org/MiDaS) for monocular 3D depth estimation models.
