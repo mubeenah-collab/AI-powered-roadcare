@@ -1,15 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from config.settings import settings
-from api.router import router
+from backend.config.settings import settings
+from backend.api.router import router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="Production-Grade AI Powered Intelligent Road Damage Detection & Monitoring System API"
+    description="Production-Grade RoadVision AI Backend Service with Road Health Scoring & Repair Lifecycle"
 )
 
-# Configure CORS Middleware for React Frontend & Mobile App Integration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,20 +17,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API Router
 app.include_router(router, prefix=settings.API_PREFIX)
 
 @app.get("/health")
 async def health_check():
-    """Service health monitoring endpoint."""
     return {
         "status": "healthy",
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
-        "yolo_model": settings.YOLO_MODEL_PATH,
-        "depth_estimation": settings.ENABLE_DEPTH_ESTIMATION
+        "yolo_model": settings.YOLO_MODEL_PATH
     }
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)

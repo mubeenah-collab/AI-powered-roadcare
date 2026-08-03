@@ -1,90 +1,177 @@
 # RoadVision: AI-Powered Intelligent Road Damage Detection & Monitoring System
 
-RoadVision is an enterprise-grade AI, Computer Vision, and Smart City MLOps platform designed to automate urban road surface damage inspection. Built as a **Unified Flutter Mobile Application (Citizen + Admin Dashboards)** backed by a **FastAPI Inference Service** and **PostGIS 10m Spatial Buffer Deduplication**.
+RoadVision is an enterprise-grade AI, Computer Vision, and Smart City MLOps platform designed to automate urban road surface damage inspection. Built as a **Flutter Mobile Application (`flutter_app/`)** backed by a **FastAPI Backend (`backend/`)**, **YOLOv11 + MiDaS AI Engine (`ai/`)**, and **PostGIS 10m Spatial Buffer Deduplication (`database/`)**.
 
 ---
 
-## 📱 Mobile-First System Architecture
+## 🏛 Project Architecture & Folder Structure
 
 ```
-                                  +------------------------------------+
-                                  |   FLUTTER MOBILE APP (Citizen Role)|
-                                  +-----------------+------------------+
-                                                    | (Camera Capture + GPS)
-                                                    v
-+------------------------------------+    +------------------------------------+
-|  GOVT FLEET CONTINUOUS MONITORING  |--->|    FastAPI Ingestion Gateway       |
-| (Buses, Garbage Trucks, Municipal) |    +-----------------+------------------+
-+------------------------------------+                      |
-  (Auto 4G/5G Stream + GPS Coordinates)                     v
-                                          +------------------------------------+
-                                          |     RoadVision AI Pipeline Engine  |
-                                          | 1. OpenCV Preprocessing & CLAHE    |
-                                          | 2. YOLOv11 Multi-Damage Detector   |
-                                          | 3. MiDaS Monocular 3D Depth Engine |
-                                          | 4. Priority & Severity Calculator  |
-                                          +-----------------+------------------+
-                                                            |
-                                                            v
-                                          +------------------------------------+
-                                          |  PostGIS Spatial Deduplication DB  |
-                                          |  (10m ST_DWithin Buffer Merge)     |
-                                          +-----------------+------------------+
-                                                            |
-                                                            v
-                                          +------------------------------------+
-                                          |  FLUTTER MOBILE APP (Admin Role)   |
-                                          +------------------------------------+
-```
-
----
-
-## 📂 Project Folder Structure
-
-```
-RoadVision-AI/
-├── config/                     # System settings, model paths & severity weights
-│   └── settings.py
-├── dataset/                    # RDD2022 dataset preparation & YOLO YAML configs
-│   ├── dataset_prep.py        # VOC XML to YOLO TXT converter & dataset splitter
-│   └── rdd2022.yaml           # Ultralytics dataset configuration
-├── database/                   # PostGIS spatial DDL schema & ORM queries
-│   ├── schema.sql              # PostgreSQL + PostGIS DDL script
-│   └── db.py                   # Async spatial queries & 10m deduplication logic
-├── utils/                      # Core Computer Vision, Math & Geocoding modules
-│   ├── image_processing.py     # OpenCV CLAHE, Bilateral filtering & Draw overlay
-│   ├── depth_estimator.py      # MiDaS Monocular Depth & 3D metric calculations
-│   ├── severity_engine.py      # Priority Score Matrix (0-100) & Severity levels
-│   └── geocoding.py            # Nominatim Reverse Geocoding & Address lookup
-├── models/                     # Model weights manager
-│   └── model_loader.py
-├── training/                   # YOLO GPU Training & Evaluation Suite
-│   ├── train.py                # Hyperparameter tuning & Albumentations pipeline
-│   └── evaluate.py             # mAP50, mAP50-95, Precision, Recall evaluator
-├── inference/                  # Production Core Pipeline
-│   └── pipeline.py             # Integrated Detector + Depth Estimator
-├── api/                        # FastAPI REST Web Service
-│   ├── main.py                 # FastAPI Application entry point
-│   ├── schemas.py              # Pydantic JSON request & response schemas
-│   └── router.py               # REST API endpoints (/auth, /citizen, /admin, /predict)
-├── mobile/                     # Flutter Mobile Application (Citizen + Admin Roles)
+RoadVision/
+├── flutter_app/                # Flutter Mobile Application (Citizen + Admin Roles)
 │   ├── lib/
-│   │   ├── config/
-│   │   │   └── theme.dart      # Dark mode color palette
-│   │   ├── services/
-│   │   │   └── api_service.dart# HTTP API client for FastAPI backend
+│   │   ├── config/             # Theme & color palette
+│   │   ├── services/           # FastAPI HTTP client service
 │   │   ├── screens/
-│   │   │   ├── auth/          # Login & Registration screens
-│   │   │   ├── citizen/       # Citizen Dashboard (Camera, GPS, Complaint Tracking)
-│   │   │   └── admin/         # Admin Dashboard (Verification, Assign Team, GIS Map)
-│   │   └── main.dart          # Main Flutter application launcher
-│   └── pubspec.yaml            # Flutter packages & dependencies
-├── docker/                     # Production Deployment Containers
-│   ├── Dockerfile.api          # FastAPI container definition
-│   └── docker-compose.yml      # Multi-container orchestration (API + PostGIS + Redis)
-├── test_inference.py          # Standalone execution test script
+│   │   │   ├── auth/           # Login & Registration
+│   │   │   ├── citizen/        # Report Damage, Nearby Defects, Emergency Contact
+│   │   │   └── admin/          # Overview, Analytics, GIS Map, Repair Lifecycle
+│   │   └── main.dart
+│   └── pubspec.yaml
+├── backend/                    # Production FastAPI Backend Service
+│   ├── api/                    # REST routers & Pydantic schemas
+│   ├── config/                 # Environment settings
+│   └── main.py                 # FastAPI application launcher
+├── ai/                         # Deep Learning & Computer Vision Engine
+│   ├── depth_estimator.py      # MiDaS Monocular Depth & 3D Metric Calculator
+│   ├── geocoding.py            # Reverse Geocoding via Nominatim
+│   ├── image_processing.py     # OpenCV CLAHE & Bilateral noise filter
+│   ├── model_loader.py         # YOLO detector singleton
+│   ├── pipeline.py             # Integrated Core AI Pipeline
+│   ├── road_health.py          # Road Health Score (0-100%) & Condition Evaluator
+│   └── severity_engine.py      # Priority Score Matrix (0-100)
+├── database/                   # PostGIS Spatial Database & ORM
+│   ├── db.py                   # Async 10m spatial buffer deduplication (`ST_DWithin`)
+│   └── schema.sql              # PostGIS DDL schema & 8-Stage Repair Lifecycle
+├── docker/                     # Container Deployment
+│   ├── Dockerfile.api
+│   └── docker-compose.yml
+├── docs/                       # Project Documentation & Architecture Diagrams
+│   ├── AI_PIPELINE_DIAGRAM.md
+│   ├── GOVERNMENT_FLEET_WORKFLOW.md
+│   ├── REPAIR_LIFECYCLE.md
+│   ├── SRS.md
+│   └── USE_CASE_DIAGRAM.md
+├── .github/                    # CI/CD Workflows
+│   └── workflows/ci.yml
 ├── requirements.txt            # Python dependencies
-└── README.md                   # Project Documentation & Defense Manual
+└── test_inference.py          # Integration test script
+```
+
+---
+
+## 🚗 1. Government Fleet Continuous Inspection Workflow
+
+```
+               [ Government Bus / Garbage Collection Truck ]
+                                    │
+                                    ▼
+                         [ Front Dashboard Camera ]
+                                    │
+                       (Captures Frame Every 5 Seconds)
+                                    │
+                                    ▼
+                      [ GPS Sensor & 4G/5G Telematics ]
+                                    │
+                       (Attaches Lat/Lng & Vehicle ID)
+                                    │
+                                    ▼
+                    [ FastAPI High-Throughput Fleet API ]
+                        (POST /api/v1/predict-batch)
+                                    │
+                                    ▼
+                      [ RoadVision Core AI Pipeline ]
+                      (YOLOv11 Detector + MiDaS Depth)
+                                    │
+                                    ▼
+                   [ Priority & Severity Scoring Engine ]
+                                    │
+                                    ▼
+                [ PostGIS 10m Spatial Buffer Deduplication ]
+                (Merges overlapping sightings within 10m)
+                                    │
+                                    ▼
+                     [ PostgreSQL + PostGIS Storage ]
+                                    │
+                                    ▼
+              [ Flutter Mobile Application (Admin Dashboard) ]
+```
+
+---
+
+## 🧠 2. End-to-End AI Inspection Pipeline Execution Sequence
+
+```
+                              [ Input Image ]
+                                     │
+                                     ▼
+                        [ OpenCV Image Preprocessing ]
+                    (CLAHE Contrast + Bilateral Noise Filter)
+                                     │
+                                     ▼
+                       [ YOLOv11 Multi-Damage Detector ]
+                                     │
+                                     ▼
+                         [ Damage Classification ]
+               (Pothole, Longitudinal, Transverse, Alligator)
+                                     │
+                                     ▼
+                      [ MiDaS Monocular Depth Estimator ]
+                     (Dense 3D Relative Depth Gradient)
+                                     │
+                                     ▼
+                [ Physical 3D Metric Calculator ]
+            ┌────────────────────────┼────────────────────────┐
+            ▼                        ▼                        ▼
+     Width Estimation        Length Estimation         Area Estimation
+            │                        │                        │
+            └────────────────────────┼────────────────────────┘
+                                     │
+                                     ▼
+                             Depth Estimation
+                                     │
+                                     ▼
+                        [ Severity & Priority Engine ]
+                    (Priority Score 0-100 & Hazard Rating)
+                                     │
+                                     ▼
+                      [ Road Health Score Evaluator ]
+                    (Overall Health % & Condition Rating)
+                                     │
+                                     ▼
+                   [ PostGIS Spatial Duplicate Detection ]
+                    (ST_DWithin 10-Meter Buffer Merge)
+                                     │
+                                     ▼
+                      [ PostgreSQL + PostGIS Storage ]
+                                     │
+                                     ▼
+                   [ Flutter Mobile Response Payload ]
+```
+
+---
+
+## 📊 3. Output AI Inspection JSON Schema
+
+```json
+{
+  "damage_type": "Pothole",
+  "confidence": 0.94,
+  "severity": "Critical",
+  "priority_score": 91,
+  "estimated_width_m": 0.85,
+  "estimated_length_m": 0.96,
+  "estimated_area_m2": 0.81,
+  "estimated_depth_cm": 9.2,
+  "road_occupancy": 8.4,
+  "latitude": 37.7749,
+  "longitude": -122.4194,
+  "road_name": "Market Street",
+  "city": "San Francisco",
+  "timestamp": "2026-08-03T18:46:48Z",
+  "source": "Citizen",
+  "road_health_score": 22.0,
+  "road_condition": "Critical"
+}
+```
+
+---
+
+## 🔄 4. 8-Stage Municipal Repair Lifecycle
+
+```
+1. Reported ➔ 2. AI Detection ➔ 3. Pending Verification ➔ 4. Verified
+➔ 5. Assigned ➔ 6. Repair In Progress ➔ 7. Completed ➔ 8. Closed
 ```
 
 ---
@@ -93,21 +180,18 @@ RoadVision-AI/
 
 ### 1. Launch FastAPI Backend Service
 ```bash
-python api/main.py
+python backend/main.py
 ```
-Open interactive Swagger API documentation at: [http://localhost:8000/docs](http://localhost:8000/docs)
+Open Swagger API docs at: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ### 2. Launch Flutter Mobile Application
 ```bash
-cd mobile
+cd flutter_app
 flutter pub get
 flutter run
 ```
 
----
-
-## 🎓 Defense Guide for Engineering Project Reviews
-
-1. **Flutter Single App Architecture**: Role-based access directs Citizens to the damage reporting portal and Administrators to the municipal verification dashboard within a single cross-platform codebase.
-2. **Dual-Channel Ingestion**: Explains how mobile citizen uploads and government vehicle continuous dashcam streaming automate city-wide road inspection.
-3. **Monocular Depth Engine**: Demonstrates how MiDaS Monocular Depth estimation extracts 3D physical width, length, area, depth ($cm$), and road occupancy $\%$ from standard mobile images.
+### 3. Run AI Pipeline Test
+```bash
+python test_inference.py
+```

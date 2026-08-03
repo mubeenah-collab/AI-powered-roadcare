@@ -1,7 +1,7 @@
-name: roadvision_mobile
+name: roadvision_app
 description: "RoadVision AI - Mobile App for Citizen Road Damage Reporting & Municipal Admin Inspection"
 publish_to: 'none'
-version: 1.0.0+1
+version: 2.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -27,5 +27,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/images/
