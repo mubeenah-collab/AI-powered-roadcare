@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: roadvision_api
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=roadvision_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - YOLO_MODEL_PATH=models/best.pt
+      - ENABLE_DEPTH_ESTIMATION=True
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: always
+
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: roadvision_postgis
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=roadvision_db
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d roadvision_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: roadvision_redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+volumes:
+  postgis_data:
