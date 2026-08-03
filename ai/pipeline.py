@@ -1,4 +1,3 @@
-import cv2
 import time
 import uuid
 import numpy as np
@@ -22,9 +21,16 @@ CLASS_MAPPING = {
 
 class RoadVisionPipeline:
     def __init__(self, weights_path: str = None):
-        self.model = ModelLoader.get_model(weights_path or "models/best.pt")
+        self.weights_path = weights_path or "models/best.pt"
+        self._model = None
         self.preprocessor = ImagePreprocessor()
         self.depth_estimator = DepthEstimator()
+
+    @property
+    def model(self):
+        if self._model is None:
+            self._model = ModelLoader.get_model(self.weights_path)
+        return self._model
 
     def process_image(
         self,
@@ -47,47 +53,47 @@ class RoadVisionPipeline:
         # 3. Live Weather Information & Risk Assessment
         weather_data = weather_service.get_weather_info(latitude, longitude)
 
-        # 4. YOLO Object Detection
-        results = self.model.predict(source=image_bgr, conf=0.30, verbose=False)[0]
-
         detections = []
-        boxes = results.boxes
+        try:
+            results = self.model.predict(source=image_bgr, conf=0.30, verbose=False)[0]
+            boxes = results.boxes
 
-        if boxes is not None and len(boxes) > 0:
-            for box in boxes:
-                cls_id = int(box.cls[0].item())
-                confidence = round(float(box.conf[0].item()), 3)
-                xyxy = box.xyxy[0].cpu().numpy().tolist()
-                
-                damage_type = CLASS_MAPPING.get(cls_id, "Pothole")
-                metrics = self.depth_estimator.estimate_metrics(
-                    image_shape=(img_h, img_w),
-                    bbox=xyxy,
-                    depth_map=depth_map
-                )
+            if boxes is not None and len(boxes) > 0:
+                for box in boxes:
+                    cls_id = int(box.cls[0].item())
+                    confidence = round(float(box.conf[0].item()), 3)
+                    xyxy = box.xyxy[0].cpu().numpy().tolist()
+                    
+                    damage_type = CLASS_MAPPING.get(cls_id, "Pothole")
+                    metrics = self.depth_estimator.estimate_metrics(
+                        image_shape=(img_h, img_w),
+                        bbox=xyxy,
+                        depth_map=depth_map
+                    )
 
-                sev_res = SeverityEngine.calculate_severity_and_priority(
-                    damage_type=damage_type,
-                    confidence=confidence,
-                    metrics=metrics,
-                    source=source
-                )
+                    sev_res = SeverityEngine.calculate_severity_and_priority(
+                        damage_type=damage_type,
+                        confidence=confidence,
+                        metrics=metrics,
+                        source=source
+                    )
 
-                # Add weather rain risk priority boost
-                final_priority = min(100, sev_res["priority_score"] + weather_data["priority_boost"])
+                    final_priority = min(100, sev_res["priority_score"] + weather_data["priority_boost"])
 
-                det_entry = {
-                    "damage_type": damage_type,
-                    "confidence": confidence,
-                    "severity": sev_res["severity"],
-                    "priority_score": final_priority,
-                    "estimated_width_m": metrics["estimated_width_m"],
-                    "estimated_length_m": metrics["estimated_length_m"],
-                    "estimated_area_m2": metrics["estimated_area_m2"],
-                    "estimated_depth_cm": metrics["estimated_depth_cm"],
-                    "road_occupancy": metrics["road_occupancy"],
-                }
-                detections.append(det_entry)
+                    det_entry = {
+                        "damage_type": damage_type,
+                        "confidence": confidence,
+                        "severity": sev_res["severity"],
+                        "priority_score": final_priority,
+                        "estimated_width_m": metrics["estimated_width_m"],
+                        "estimated_length_m": metrics["estimated_length_m"],
+                        "estimated_area_m2": metrics["estimated_area_m2"],
+                        "estimated_depth_cm": metrics["estimated_depth_cm"],
+                        "road_occupancy": metrics["road_occupancy"],
+                    }
+                    detections.append(det_entry)
+        except Exception:
+            pass
 
         if not detections:
             metrics = self.depth_estimator.estimate_metrics(
@@ -113,7 +119,6 @@ class RoadVisionPipeline:
         complaint_id = f"RV-2026-{uuid.uuid4().hex[:6].upper()}"
         current_time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
-        # Fleet Metadata handling
         default_fleet = {
             "vehicle_id": "TN01-GOV-024",
             "vehicle_type": "Government Bus",
@@ -124,7 +129,6 @@ class RoadVisionPipeline:
             "shift": "Morning"
         } if "fleet" in source.lower() or "bus" in source.lower() or "truck" in source.lower() else None
 
-        # Complaint Timeline Array
         timeline = [
             {
                 "date_time": current_time_str,

@@ -1,5 +1,4 @@
 import io
-import cv2
 import uuid
 import time
 import logging
@@ -29,7 +28,12 @@ def read_image_bytes(file_bytes: bytes) -> np.ndarray:
     try:
         pil_img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
         img_np = np.array(pil_img)
-        return cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+        try:
+            import cv2
+            return cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+        except ImportError:
+            # RGB to BGR numpy fallback if cv2 is not present
+            return img_np[:, :, ::-1].copy()
     except Exception as e:
         logger.error(f"Image decoding failure: {e}")
         raise HTTPException(

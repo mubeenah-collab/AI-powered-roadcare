@@ -1,6 +1,15 @@
+import os
+import sys
 import logging
+from pathlib import Path
+
+# Ensure project root directory is present in sys.path so imports like 'from backend...' resolve cleanly
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config.settings import settings
 from backend.api.router import router
@@ -17,7 +26,10 @@ logger = logging.getLogger("roadvision.backend")
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="Production-Grade RoadVision AI Backend API with PostgreSQL + PostGIS Spatial Deduplication & Road Health Scoring"
+    description="Production-Grade RoadVision AI Backend API with PostgreSQL + PostGIS Spatial Deduplication & Road Health Scoring",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
 )
 
 # CORS Middleware
@@ -39,7 +51,7 @@ async def startup_db_init():
     except Exception as e:
         logger.warning(f"[!] PostgreSQL startup connection warning (running with resilient database layer): {e}")
 
-# Global Exception Handlers
+# Global Exception Handlers for non-HTTP exceptions
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled Exception on {request.url}: {exc}", exc_info=True)
@@ -54,6 +66,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 app.include_router(router, prefix=settings.API_PREFIX)
+
+@app.get("/", include_in_schema=False)
+async def root_redirect():
+    """Redirect root endpoint directly to Swagger UI."""
+    return RedirectResponse(url="/docs")
 
 @app.get("/health", tags=["Health"])
 async def health_check():
