@@ -2,10 +2,11 @@ import io
 import cv2
 import uuid
 import time
+import logging
 import numpy as np
 from PIL import Image
 from typing import List, Optional
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Query
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Query, status
 from backend.api.schemas import (
     DamagePredictionSchema,
     CompleteRepairPayloadSchema,
@@ -14,17 +15,32 @@ from backend.api.schemas import (
 from ai.pipeline import pipeline
 from database.db import db_manager
 
+logger = logging.getLogger("roadvision.api")
 router = APIRouter()
 
 def read_image_bytes(file_bytes: bytes) -> np.ndarray:
+    if not file_bytes or len(file_bytes) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty."
+        )
     try:
         pil_img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
         img_np = np.array(pil_img)
         return cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid image file: {e}")
+        logger.error(f"Image decoding failure: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid image file format: {e}"
+        )
 
-@router.post("/predict", response_model=DamagePredictionSchema)
+@router.post(
+    "/predict", 
+    response_model=DamagePredictionSchema,
+    summary="Single Road Damage Inspection & Detection",
+    description="Processes uploaded image using CLAHE + YOLOv11 + MiDaS, reverse geocodes Indian address, computes Road Health Score, and checks 10m PostGIS deduplication."
+)
 @router.post("/citizen/upload", response_model=DamagePredictionSchema)
 async def predict_road_damage(
     file: UploadFile = File(...),
@@ -32,9 +48,6 @@ async def predict_road_damage(
     longitude: float = Form(80.143287),
     source: str = Form("Citizen")
 ):
-    """
-    Primary AI Inference API with Indian Geocoding, Live Weather, and Priority Boost.
-    """
     contents = await file.read()
     image_bgr = read_image_bytes(contents)
     
@@ -45,16 +58,47 @@ async def predict_road_damage(
         source=source
     )
 
-    await db_manager.save_or_merge_report(result)
+    db_record = {
+        "id": result["complaint_id"],
+        "image_id": f"img_{uuid.uuid4().hex[:8]}",
+        "source": source,
+        "damage_type": result["damage_type"],
+        "confidence": result["confidence"],
+        "severity": result["severity"],
+        "priority_score": result["priority_score"],
+        "estimated_width_m": result["estimated_width_m"],
+        "estimated_length_m": result["estimated_length_m"],
+        "estimated_area_m2": result["estimated_area_m2"],
+        "estimated_depth_cm": result["estimated_depth_cm"],
+        "road_occupancy": result["road_occupancy"],
+        "coordinates": result["coordinates"],
+        "location": result["location"],
+        "weather": result["weather"],
+        "timeline": result["timeline"],
+        "status": result["status"],
+        "road_health_score": result["road_health_score"],
+        "road_condition": result["road_condition"]
+    }
+    await db_manager.save_or_merge_report(db_record)
     return DamagePredictionSchema(**result)
 
-@router.post("/predict-batch")
+@router.post(
+    "/predict-batch",
+    summary="Government Fleet Continuous Inspection Ingestion",
+    description="Processes sequential camera frame uploads from fleet dashcams (buses, garbage trucks)."
+)
 async def predict_batch_fleet(
     files: List[UploadFile] = File(...),
     vehicle_id: str = Form("TN01-GOV-024"),
     vehicle_type: str = Form("Government Bus"),
     department: str = Form("Greater Chennai Corporation")
 ):
+    if not files or len(files) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No files provided in batch upload request."
+        )
+
     fleet_meta = {
         "vehicle_id": vehicle_id,
         "vehicle_type": vehicle_type,
@@ -73,32 +117,33 @@ async def predict_batch_fleet(
         results.append(res)
         
     return {
+        "status": "success",
         "vehicle_id": vehicle_id,
         "processed_count": len(files),
         "detections": results
     }
 
-@router.get("/admin/complaints")
+@router.get("/admin/complaints", summary="Get Active Complaints List")
 @router.get("/complaints")
 async def get_all_complaints(limit: int = Query(100, ge=1, le=500)):
     reports = await db_manager.get_all_reports(limit=limit)
     return {"status": "success", "count": len(reports), "reports": reports}
 
-@router.put("/admin/repair-complete/{complaint_id}")
+@router.put(
+    "/admin/repair-complete/{complaint_id}",
+    summary="Complete Repair Task with After-Image Verification",
+    description="Submits after-repair image, updates lifecycle timeline, and sets status to Completed."
+)
 async def complete_repair_with_after_image(
     complaint_id: str,
     payload: CompleteRepairPayloadSchema
 ):
-    """
-    Uploads After-Repair Road Image, adds Timeline Event, and advances Lifecycle Status to Completed.
-    """
     reports = await db_manager.get_all_reports(limit=500)
     for r in reports:
         if r.get("complaint_id") == complaint_id or r.get("id") == complaint_id:
             r["status"] = "Completed"
             r["after_image_url"] = payload.after_image_url
             
-            # Append Timeline Stage
             timeline = r.get("timeline", [])
             timeline.append({
                 "date_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
@@ -108,15 +153,19 @@ async def complete_repair_with_after_image(
             })
             r["timeline"] = timeline
             
+            logger.info(f"[+] Complaint {complaint_id} marked as Completed by {payload.officer_name}")
             return {
                 "status": "success",
-                "message": f"Repair for complaint {complaint_id} marked as Completed with After-Repair image verification.",
+                "message": f"Repair for complaint {complaint_id} completed successfully.",
                 "report": r
             }
             
-    raise HTTPException(status_code=404, detail="Complaint ID not found.")
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Complaint ID '{complaint_id}' not found."
+    )
 
-@router.get("/admin/dashboard", response_model=AdvancedAnalyticsSchema)
+@router.get("/admin/dashboard", response_model=AdvancedAnalyticsSchema, summary="Analytics Dashboard KPI Metrics")
 @router.get("/admin/analytics", response_model=AdvancedAnalyticsSchema)
 async def get_advanced_analytics():
     analytics = await db_manager.get_analytics_summary()
