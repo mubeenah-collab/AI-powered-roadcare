@@ -4,7 +4,7 @@ import uuid
 import numpy as np
 from PIL import Image
 from typing import List, Optional
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Query, Path
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Query
 from backend.api.schemas import (
     DamagePredictionSchema,
     LifecycleStatusUpdateSchema,
@@ -27,13 +27,14 @@ def read_image_bytes(file_bytes: bytes) -> np.ndarray:
 @router.post("/citizen/upload", response_model=DamagePredictionSchema)
 async def predict_road_damage(
     file: UploadFile = File(...),
-    latitude: float = Form(37.7749),
-    longitude: float = Form(-122.4194),
+    latitude: float = Form(12.926543),
+    longitude: float = Form(80.143287),
     source: str = Form("Citizen")
 ):
     """
-    Primary AI Inference Endpoint.
-    Executes OpenCV Preprocessing -> YOLOv11 Detection -> MiDaS Depth -> Severity -> Priority -> Road Health Score.
+    Primary Road Vision AI Detection API.
+    Captures GPS coordinates, performs Reverse Geocoding to derive Human-Readable Address,
+    executes YOLOv11 & MiDaS monocular 3D depth, and saves internal coordinates to PostGIS.
     """
     contents = await file.read()
     image_bgr = read_image_bytes(contents)
@@ -45,10 +46,10 @@ async def predict_road_damage(
         source=source
     )
 
-    # Save to database for PostGIS deduplication and lifecycle tracking
     db_record = {
+        "id": result["complaint_id"],
         "image_id": f"img_{uuid.uuid4().hex[:8]}",
-        "source_type": source.lower(),
+        "source": source,
         "damage_type": result["damage_type"],
         "confidence": result["confidence"],
         "severity": result["severity"],
@@ -57,13 +58,12 @@ async def predict_road_damage(
         "estimated_length_m": result["estimated_length_m"],
         "estimated_area_m2": result["estimated_area_m2"],
         "estimated_depth_cm": result["estimated_depth_cm"],
-        "road_occupancy_pct": result["road_occupancy"],
-        "latitude": latitude,
-        "longitude": longitude,
-        "road_name": result["road_name"],
-        "city": result["city"],
-        "status": "Pending Verification",
-        "road_health_score": result["road_health_score"]
+        "road_occupancy": result["road_occupancy"],
+        "coordinates": result["coordinates"],
+        "location": result["location"],
+        "status": result["status"],
+        "road_health_score": result["road_health_score"],
+        "road_condition": result["road_condition"]
     }
     await db_manager.save_or_merge_report(db_record)
 
@@ -74,7 +74,6 @@ async def predict_batch_fleet(
     files: List[UploadFile] = File(...),
     vehicle_id: str = Form("GOVT-BUS-102")
 ):
-    """High-Throughput Government Fleet Dashcam Frame Ingestion Pipeline."""
     results = []
     for file in files:
         contents = await file.read()
@@ -95,25 +94,14 @@ async def get_all_complaints(limit: int = Query(100, ge=1, le=500)):
     return {"status": "success", "count": len(reports), "reports": reports}
 
 @router.put("/admin/lifecycle/{complaint_id}")
-async def update_repair_lifecycle_status(
-    complaint_id: str,
-    payload: LifecycleStatusUpdateSchema
-):
-    """
-    Manages the 8-Stage Repair Lifecycle:
-    Reported -> AI Detection -> Pending Verification -> Verified -> Assigned -> Repair In Progress -> Completed -> Closed
-    """
+async def update_repair_lifecycle_status(complaint_id: str, payload: LifecycleStatusUpdateSchema):
     reports = await db_manager.get_all_reports(limit=500)
     for r in reports:
-        if r["id"] == complaint_id:
+        if r.get("id") == complaint_id:
             r["status"] = payload.status
             if payload.contractor_name:
                 r["assigned_contractor"] = payload.contractor_name
-            return {
-                "status": "success",
-                "message": f"Complaint {complaint_id} updated to status [{payload.status}]",
-                "report": r
-            }
+            return {"status": "success", "message": f"Complaint {complaint_id} updated to status [{payload.status}]", "report": r}
             
     raise HTTPException(status_code=404, detail="Complaint ID not found.")
 
@@ -125,11 +113,8 @@ async def get_analytics_dashboard():
         total_complaints=stats["total_complaints"],
         critical_defects=stats["critical"],
         high_defects=stats["high"],
-        pending_verification=stats["pending_repairs"],
-        assigned_repairs=stats["pending_repairs"],
-        repairs_in_progress=2,
+        pending_repairs=stats["pending_repairs"],
         completed_repairs=stats["completed_repairs"],
         citizen_reports_count=stats["citizen_reports"],
-        government_fleet_count=stats["government_reports"],
-        average_road_health=74.5
+        government_fleet_count=stats["government_reports"]
     )

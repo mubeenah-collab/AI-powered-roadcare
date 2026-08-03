@@ -15,12 +15,12 @@ def create_synthetic_road_image() -> np.ndarray:
 
 def run_test():
     print("=" * 60)
-    print("   RoadVision AI Pipeline Integration Test")
+    print("   RoadVision AI Pipeline Location Enhancement Test")
     print("=" * 60)
 
     img = create_synthetic_road_image()
-    sample_lat, sample_lng = 37.7749, -122.4194
-    print(f"[*] Running inference with sample coordinates ({sample_lat}, {sample_lng})...")
+    sample_lat, sample_lng = 12.926543, 80.143287
+    print(f"[*] Reverse geocoding sample GPS ({sample_lat}, {sample_lng})...")
     
     result = pipeline.process_image(
         image_bgr=img,
@@ -29,7 +29,7 @@ def run_test():
         source="Citizen"
     )
 
-    print("\n[+] Structured Pipeline Output JSON (Matching Specification):")
+    print("\n[+] Expected Structured Output JSON (Human-Readable Address + Internal Coordinates):")
     print(json.dumps(result, indent=2))
     print("=" * 60)
 
