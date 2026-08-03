@@ -6,7 +6,8 @@ import logging
 import numpy as np
 from PIL import Image
 from typing import List, Optional
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Query, status
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Query, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
 from backend.api.schemas import (
     DamagePredictionSchema,
     CompleteRepairPayloadSchema,
@@ -14,6 +15,7 @@ from backend.api.schemas import (
 )
 from ai.pipeline import pipeline
 from database.db import db_manager
+from database.connection import get_async_db
 
 logger = logging.getLogger("roadvision.api")
 router = APIRouter()
@@ -39,14 +41,15 @@ def read_image_bytes(file_bytes: bytes) -> np.ndarray:
     "/predict", 
     response_model=DamagePredictionSchema,
     summary="Single Road Damage Inspection & Detection",
-    description="Processes uploaded image using CLAHE + YOLOv11 + MiDaS, reverse geocodes Indian address, computes Road Health Score, and checks 10m PostGIS deduplication."
+    description="Processes uploaded image using CLAHE + YOLOv11 + MiDaS, reverse geocodes Indian address, computes Road Health Score, and checks 10m PostGIS deduplication in PostgreSQL."
 )
 @router.post("/citizen/upload", response_model=DamagePredictionSchema)
 async def predict_road_damage(
     file: UploadFile = File(...),
     latitude: float = Form(12.926543),
     longitude: float = Form(80.143287),
-    source: str = Form("Citizen")
+    source: str = Form("Citizen"),
+    db: AsyncSession = Depends(get_async_db)
 ):
     contents = await file.read()
     image_bgr = read_image_bytes(contents)
@@ -60,6 +63,7 @@ async def predict_road_damage(
 
     db_record = {
         "id": result["complaint_id"],
+        "complaint_id": result["complaint_id"],
         "image_id": f"img_{uuid.uuid4().hex[:8]}",
         "source": source,
         "damage_type": result["damage_type"],
@@ -85,13 +89,14 @@ async def predict_road_damage(
 @router.post(
     "/predict-batch",
     summary="Government Fleet Continuous Inspection Ingestion",
-    description="Processes sequential camera frame uploads from fleet dashcams (buses, garbage trucks)."
+    description="Processes sequential camera frame uploads from fleet dashcams (buses, garbage trucks) with PostgreSQL persistence."
 )
 async def predict_batch_fleet(
     files: List[UploadFile] = File(...),
     vehicle_id: str = Form("TN01-GOV-024"),
     vehicle_type: str = Form("Government Bus"),
-    department: str = Form("Greater Chennai Corporation")
+    department: str = Form("Greater Chennai Corporation"),
+    db: AsyncSession = Depends(get_async_db)
 ):
     if not files or len(files) == 0:
         raise HTTPException(
@@ -114,6 +119,31 @@ async def predict_batch_fleet(
         contents = await file.read()
         image_bgr = read_image_bytes(contents)
         res = pipeline.process_image(image_bgr, source="Government Fleet", fleet_meta=fleet_meta)
+        
+        db_record = {
+            "id": res["complaint_id"],
+            "complaint_id": res["complaint_id"],
+            "image_id": f"img_{uuid.uuid4().hex[:8]}",
+            "source": "Government Fleet",
+            "damage_type": res["damage_type"],
+            "confidence": res["confidence"],
+            "severity": res["severity"],
+            "priority_score": res["priority_score"],
+            "estimated_width_m": res["estimated_width_m"],
+            "estimated_length_m": res["estimated_length_m"],
+            "estimated_area_m2": res["estimated_area_m2"],
+            "estimated_depth_cm": res["estimated_depth_cm"],
+            "road_occupancy": res["road_occupancy"],
+            "coordinates": res["coordinates"],
+            "location": res["location"],
+            "weather": res["weather"],
+            "fleet_info": fleet_meta,
+            "timeline": res["timeline"],
+            "status": res["status"],
+            "road_health_score": res["road_health_score"],
+            "road_condition": res["road_condition"]
+        }
+        await db_manager.save_or_merge_report(db_record)
         results.append(res)
         
     return {
@@ -125,18 +155,22 @@ async def predict_batch_fleet(
 
 @router.get("/admin/complaints", summary="Get Active Complaints List")
 @router.get("/complaints")
-async def get_all_complaints(limit: int = Query(100, ge=1, le=500)):
+async def get_all_complaints(
+    limit: int = Query(100, ge=1, le=500),
+    db: AsyncSession = Depends(get_async_db)
+):
     reports = await db_manager.get_all_reports(limit=limit)
     return {"status": "success", "count": len(reports), "reports": reports}
 
 @router.put(
     "/admin/repair-complete/{complaint_id}",
     summary="Complete Repair Task with After-Image Verification",
-    description="Submits after-repair image, updates lifecycle timeline, and sets status to Completed."
+    description="Submits after-repair image, updates lifecycle timeline in PostgreSQL, and sets status to Completed."
 )
 async def complete_repair_with_after_image(
     complaint_id: str,
-    payload: CompleteRepairPayloadSchema
+    payload: CompleteRepairPayloadSchema,
+    db: AsyncSession = Depends(get_async_db)
 ):
     reports = await db_manager.get_all_reports(limit=500)
     for r in reports:
@@ -153,7 +187,7 @@ async def complete_repair_with_after_image(
             })
             r["timeline"] = timeline
             
-            logger.info(f"[+] Complaint {complaint_id} marked as Completed by {payload.officer_name}")
+            logger.info(f"[+] Complaint {complaint_id} marked as Completed by {payload.officer_name} in PostgreSQL")
             return {
                 "status": "success",
                 "message": f"Repair for complaint {complaint_id} completed successfully.",
@@ -167,6 +201,6 @@ async def complete_repair_with_after_image(
 
 @router.get("/admin/dashboard", response_model=AdvancedAnalyticsSchema, summary="Analytics Dashboard KPI Metrics")
 @router.get("/admin/analytics", response_model=AdvancedAnalyticsSchema)
-async def get_advanced_analytics():
+async def get_advanced_analytics(db: AsyncSession = Depends(get_async_db)):
     analytics = await db_manager.get_analytics_summary()
     return AdvancedAnalyticsSchema(**analytics)
