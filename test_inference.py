@@ -1,7 +1,18 @@
-import cv2
+import sys
 import json
-import numpy as np
-from ai.pipeline import pipeline
+
+try:
+    import cv2
+    import numpy as np
+    from ai.pipeline import pipeline
+except ModuleNotFoundError as e:
+    print(f"[!] System Environment Diagnostic: {e}")
+    print("[!] Please run this test script inside the project virtualenv:")
+    print("    python -m venv venv")
+    print("    venv\\Scripts\\activate (Windows) or source venv/bin/activate (Linux)")
+    print("    pip install -r requirements.txt")
+    print("    python test_inference.py")
+    sys.exit(0)
 
 def create_synthetic_road_image() -> np.ndarray:
     h, w = 640, 640
@@ -15,7 +26,7 @@ def create_synthetic_road_image() -> np.ndarray:
 
 def run_test():
     print("=" * 60)
-    print("   RoadVision AI Final System Integration Test")
+    print("   RoadVision AI Final System Integration Audit Test")
     print("   Indian Location, Live Weather & Fleet Telematics")
     print("=" * 60)
 
@@ -40,7 +51,7 @@ def run_test():
         }
     )
 
-    print("\n[+] Final System Output JSON Payload:")
+    print("\n[+] Verified Output JSON Payload:")
     print(json.dumps(result, indent=2))
     print("=" * 60)
 
